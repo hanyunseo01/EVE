@@ -6,7 +6,8 @@
 
 **ThyroScope** is a streamlined, containerized bioinformatics pipeline designed to "scope out" and analyze thyroid-specific variants from **Whole Exome Sequencing (WES)** data.
 
-By leveraging a **"Lightweight Containerization Strategy"** and a **"Virtual Panel approach"**, ThyroScope allows clinicians to bypass complex command-line interfaces. It automates the entire workflow—from raw FASTQ to a clinical-grade Excel report—with a single click, focusing specifically on 25 high-priority genes associated with thyroid and parathyroid disorders.
+By leveraging a **"Lightweight Containerization Strategy"** and a **"Virtual Panel approach"**, ThyroScope allows clinicians to bypass complex command-line interfaces. It automates the entire workflow from raw FASTQ to a clinical-grade Excel report with a single click, focusing specifically on 25 high-priority genes associated with thyroid and parathyroid disorders.
+
 ![ThyroScope Pipeline Diagram](canvas-image-1-1768740173287.png)
 
 ---
