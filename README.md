@@ -88,7 +88,7 @@ docker run --rm \
   -v "${PWD}/ref:/data/ref" \
   -v "${PWD}/snpEff_db:/pipeline/snpEff/data" \
   hanyunseo01/thyroid_pipeline:v23
-
+```
 ---
 
 ## 📄 Output Files
@@ -117,3 +117,43 @@ The **Clinical Report** is designed for immediate clinical interpretation. It ag
 | **In Silico Scores** | `SIFT`, `PolyPhen` | Computational predictions of how the variant affects protein function. |
 
 > **💡 Tip for Clinicians:** Start by filtering the **`Impact`** column for **HIGH** or **MODERATE**, and check the **`ClinVar`** column for known pathogenic variants.
+
+---
+
+## 🔬 Pipeline Workflow (Methods)
+ThyroScope automates the following bioinformatics steps in a sequential manner:
+
+1.  **QC & Trimming** ✂️
+    * **Tools:** `FastQC`, `Trimmomatic`
+    * **Details:** Adapter removal, Quality trimming (`SlidingWindow:4:15`).
+2.  **Alignment** 🧬
+    * **Tool:** `BWA-MEM`
+    * **Reference:** Aligned to the **GRCh38 (hg38)** reference genome.
+3.  **Post-Processing** 🧹
+    * **Tools:** `Samtools` (Sort/Index), `GATK MarkDuplicates`.
+    * **Details:** Sorting BAM files and marking PCR duplicates to ensure accurate variant calling.
+4.  **Coverage Analysis** 📉
+    * **Tool:** `Mosdepth`
+    * **Details:** Rapid depth-of-coverage check specifically for the targeted regions.
+5.  **Variant Calling** 🔍
+    * **Tool:** `GATK HaplotypeCaller`
+    * **Details:** Calling germline variants with `--interval-padding 100` to capture essential splice site regions.
+6.  **Annotation** 📝
+    * **Tools:** `SnpEff` (HGVS notation), `MyVariant.info` API.
+    * **Databases:** ClinVar, gnomAD (Global AF), dbSNP (rsID), dbNSFP (SIFT/PolyPhen).
+7.  **Reporting** 📊
+    * **Output:** A custom Python script aggregates all data into a **Hybrid Clinical Excel Report** and generates a **MultiQC** HTML summary.
+
+---
+
+## 📜 Citation & Contact
+
+If you use **ThyroScope** in your research, please cite the following paper:
+
+> 
+### ✉️ Contact
+
+For technical support, bug reports, or collaboration inquiries, please contact:
+
+* **Developer:** Yun-seo Han ([hanyunseo01@ekorea.ac.kr](mailto:hanyunseo01@korea.ac.kr))
+* **Lab:** H-Lee Lab, Department of Life Sciences
