@@ -1,12 +1,14 @@
-# 🔭 ThyroScope: Clinical-Grade WES Pipeline for Thyroid and Parathyroid Disorders
+# 🧬 EVE: Endocrine Variant Extractor
+### Clinical-Grade WES Pipeline for Endocrine and Parathyroid Disorders
 
 [![Docker Image Version](https://img.shields.io/docker/v/hanyunseo01/thyroid_pipeline/v23?color=blue&label=Docker%20Image)](https://hub.docker.com/r/hanyunseo01/thyroid_pipeline)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](https://www.docker.com/)
 
-**ThyroScope** is a streamlined, containerized bioinformatics pipeline designed to "scope out" and analyze thyroid-specific variants from **Whole Exome Sequencing (WES)** data.
+**EVE (Endocrine Variant Extractor)** is a streamlined, containerized bioinformatics pipeline optimized for the clinical interpretation of **Whole Exome Sequencing (WES)** data, with a specific focus on endocrine and parathyroid pathologies.
 
-By leveraging a **"Lightweight Containerization Strategy"** and a **"Virtual Panel approach"**, ThyroScope allows clinicians to bypass complex command-line interfaces. It automates the entire workflow from raw FASTQ to a clinical-grade Excel report with a single click, focusing specifically on 25 high-priority genes associated with thyroid and parathyroid disorders.
+By leveraging a **"Lightweight Containerization Strategy"** and a **"Virtual Panel approach"**, ThyroScope allows clinicians to bypass complex command-line interfaces. It automates the entire workflow from raw FASTQ to a clinical-grade Excel report with a single click, focusing specifically on 25 high-priority genes associated with parathyroid disorders and an expanded panel of 400 genes related to broader endocrine pathologies.
+By integrating a **"Virtual Panel"** approach, EVE filters massive genomic data using a dual-tiered strategy: a **Core Parathyroid Panel (26 genes)** for primary high-confidence screening and an **Endocrine Expansion Panel (400 genes)** for comprehensive differential diagnosis. This enabling clinicians to identify pathogenic variants with high precision and minimal computational overhead.
 
 ![ThyroScope Pipeline Diagram](Thyro_pipeline.png)
 
@@ -14,7 +16,9 @@ By leveraging a **"Lightweight Containerization Strategy"** and a **"Virtual Pan
 
 ## 🚀 Key Features
 
-* **🔭 Targeted Precision:** Implements a "Virtual Panel" to filter WES data for 25 key genes (e.g., *BRAF, RET, TSHR*), drastically reducing incidental findings.
+* **🎯 Dual-Tiered Virtual Panel:** Implements a sophisticated filtering strategy designed to maximize diagnostic yield:
+    * **Tier 1 (Core):** 26 high-priority genes directly associated with parathyroid disorders
+    * **Tier 2 (Expansion):** 400 genes related to broader endocrine pathologies for expanded clinical investigation and differential diagnosis.
 * **🐳 Dockerized & Reproducible:** Encapsulates GATK 4.4, BWA, Samtools, and Python dependencies in a portable Docker image, ensuring identical results on any OS.
 * **📉 Lightweight Architecture:** Heavy reference databases (hg38 Ref, SnpEff DB) are externalized, keeping the Docker image light (~2GB) and easy to distribute.
 * **📊 Comprehensive QC Reports:**
@@ -29,7 +33,7 @@ By leveraging a **"Lightweight Containerization Strategy"** and a **"Virtual Pan
 ---
 
 ## 🔬 Pipeline Workflow (Methods)
-ThyroScope automates the following bioinformatics steps in a sequential manner:
+EVE automates the following bioinformatics steps in a sequential manner:
 
 1.  **QC & Trimming** ✂️
     * **Tools:** `FastQC`, `Trimmomatic`
@@ -45,13 +49,16 @@ ThyroScope automates the following bioinformatics steps in a sequential manner:
     * **Details:** Rapid depth-of-coverage check specifically for the targeted regions.
 5.  **Variant Calling** 🔍
     * **Tool:** `GATK HaplotypeCaller`
-    * **Details:** Calling germline variants with `--interval-padding 100` to capture essential splice site regions.
+    * **Virtual Panel Filtering:** To optimize speed and precision, variant calling is restricted to the **26 + 400 gene intervals** with `--interval-padding 100` to capture critical splice site regions.
 6.  **Annotation** 📝
     * **Tools:** `SnpEff` (HGVS notation), `MyVariant.info` API.
-    * **Databases:** ClinVar, gnomAD (Global AF), dbSNP (rsID), dbNSFP (SIFT/PolyPhen).
-7.  **Reporting** 📊
-    * **Output:** A custom Python script aggregates all data into a **Hybrid Clinical Excel Report** and generates a **MultiQC** HTML summary.
-
+    * **Databases:** ClinVar, gnomAD (Global AF), dbSNP (rsID), dbNSFP  (SIFT/PolyPhen).
+7.  **Tiered Reporting & Final Filtering** 📊
+    * **Output:** A custom Python script aggregates all data into a **Hybrid Clinical Excel Report**.
+    * **Virtual Panel Filtering:** The script automatically categorizes variants into:
+        * **Tier 1 Sheet:** Core Parathyroid Panel (26 genes).
+        * **Tier 2 Sheet:** Endocrine Expansion Panel (400 genes).
+    * **Quality Filtering:** Includes MultiQC HTML summary for batch-level quality metrics.
 ---
 
 ## 🛠️ System Requirements
@@ -65,7 +72,7 @@ ThyroScope automates the following bioinformatics steps in a sequential manner:
 
 ## 📥 Installation & Setup
 
-Since ThyroScope uses a **lightweight strategy**, you must download the reference bundles separately.
+Since EVE uses a **lightweight strategy**, you must download the reference bundles separately.
 
 1.  **Clone this Repository** (or download the ZIP):
     ```bash
@@ -75,13 +82,13 @@ Since ThyroScope uses a **lightweight strategy**, you must download the referenc
 
 2.  **Download Reference Data:**
     * Download the `ref` (BWA Indices) and `snpEff_db` folders from our repository storage.
-    * [**📂 Download Link (Google Drive / Dropbox)**](#) *(Link to be updated)*
+    * [**📂 Download Link (Google Drive)**](#) *(Link to be updated)*
     * Place them in your project folder.
 
 3.  **Directory Structure:**
     Ensure your folder looks exactly like this before running:
     ```text
-    ThyroScope/
+    EVE/
     ├── 📂 data/             <-- Put your FASTQ files here (e.g., Patient_1.fq.gz)
     ├── 📂 ref/              <-- Contains hg38.fasta, .bwt, .pac, etc.
     ├── 📂 snpEff_db/        <-- Contains 'hg38' folder
@@ -107,7 +114,7 @@ Run the Docker container manually using the following command:
 
 ```bash
 # Move to your project directory
-cd /path/to/ThyroScope
+cd /path/to/EVE
 
 # Run the pipeline (v23)
 docker run --rm \
@@ -124,7 +131,7 @@ After the analysis completes, check the `data/` folder for these key files:
 
 | File Name | Description |
 | :--- | :--- |
-| **`*_Clinical_Report.xlsx`** | **The Final Report.** A comprehensive Excel file containing filtered variants annotated with Variant ID (rsID), ClinVar, gnomAD AF, SIFT/PolyPhen, and Impact. |
+| **`*_Clinical_Report.xlsx`** | **The Final Report.** A comprehensive, dual-tiered Excel file organized into two separate sheets: **Sheet 1 (Core Parathyroid Panel, 26 genes)** and **Sheet 2 (Endocrine Expansion Panel, 400 genes)**. All variants are fully annotated with rsID, ClinVar, gnomAD AF, SIFT/PolyPhen, and Impact. |
 | **`*_MultiQC_Report.html`** | **Quality Control.** Interactive graphs showing read quality, mapping rates, and duplicate levels. Open with any web browser. |
 | **`*_coverage.mosdepth.summary.txt`** | **Depth Statistics.** Shows how well the target genes were covered (e.g., mean depth, % bases > 20x). |
 | `*.bam` / `*.vcf` | Intermediate alignment and variant calling files for further manual inspection (IGV). |
@@ -149,7 +156,7 @@ The **Clinical Report** is designed for immediate clinical interpretation. It ag
 
 ## 🛠️ Troubleshooting
 
-If you encounter issues while running **ThyroScope**, check the solutions below for common problems.
+If you encounter issues while running **EVE**, check the solutions below for common problems.
 
 
 #### 1. `is not a valid Windows path` Error ⚠️
@@ -202,7 +209,7 @@ If you are using Docker with the WSL2 backend, you can manually limit or allocat
 ---
 ## 📜 Citation & Contact
 
-If you use **ThyroScope** in your research, please cite the following paper:
+If you use **EVE** in your research, please cite the following paper:
 
 > 
 ### ✉️ Contact
