@@ -76,7 +76,7 @@ Since EVE uses a **lightweight strategy**, you must download the reference bundl
 
 1.  **Clone this Repository** (or download the ZIP):
     ```bash
-    git clone [https://github.com/hanyunseo01/ThyroScope.git](https://github.com/hanyunseo01/ThyroScope.git)
+    git clone [https://github.com/hanyunseo01/EVE.git](https://github.com/hanyunseo01/EVE.git)
     cd ThyroScope
     ```
 
@@ -92,6 +92,8 @@ Since EVE uses a **lightweight strategy**, you must download the reference bundl
     ├── 📂 data/             <-- Put your FASTQ files here (e.g., Patient_1.fq.gz)
     ├── 📂 ref/              <-- Contains hg38.fasta, .bwt, .pac, etc.
     ├── 📂 snpEff_db/        <-- Contains 'hg38' folder
+    ├── 📄 hypopara_targets.bed
+    ├── 📄 endocrine_targets.bed
     ├── 📄 Run_Analysis.bat  <-- For Windows Users
     ├── 📄 pipeline_script.py
     └── 📄 Dockerfile
@@ -121,7 +123,7 @@ docker run --rm \
   -v "${PWD}/data:/data" \
   -v "${PWD}/ref:/data/ref" \
   -v "${PWD}/snpEff_db:/pipeline/snpEff/data" \
-  hanyunseo01/thyroid_pipeline:v23
+  hanyunseo01/eve:1.0
 ```
 ---
 
