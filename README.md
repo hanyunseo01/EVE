@@ -10,7 +10,7 @@
 By leveraging a **"Lightweight Containerization Strategy"** and a **"Virtual Panel approach"**, ThyroScope allows clinicians to bypass complex command-line interfaces. It automates the entire workflow from raw FASTQ to a clinical-grade Excel report with a single click, focusing specifically on 25 high-priority genes associated with parathyroid disorders and an expanded panel of 400 genes related to broader endocrine pathologies.
 By integrating a **"Virtual Panel"** approach, EVE filters massive genomic data using a dual-tiered strategy: a **Core Parathyroid Panel (26 genes)** for primary high-confidence screening and an **Endocrine Expansion Panel (400 genes)** for comprehensive differential diagnosis. This enabling clinicians to identify pathogenic variants with high precision and minimal computational overhead.
 
-![ThyroScope Pipeline Diagram](Thyro_pipeline.png)
+![EVE Pipeline Diagram](EVE_pipeline.png)
 
 ---
 
