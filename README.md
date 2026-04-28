@@ -86,17 +86,14 @@ Since EVE uses a **lightweight strategy**, you must download the reference bundl
     * Place them in your project folder.
 
 3.  **Directory Structure:**
-    Ensure your folder looks exactly like this before running:
+    Create a workspace folder and arrange your files exactly as shown below.
     ```text
     EVE/
-    ├── 📂 data/             <-- Put your FASTQ files here (e.g., Patient_1.fq.gz)
-    ├── 📂 ref/              <-- Contains hg38.fasta, .bwt, .pac, etc.
-    ├── 📂 snpEff_db/        <-- Contains 'hg38' folder
-    ├── 📄 hypopara_targets.bed
-    ├── 📄 endocrine_targets.bed
-    ├── 📄 Run_Analysis.bat  <-- For Windows Users
-    ├── 📄 pipeline_script.py
-    └── 📄 Dockerfile
+    📁 EVE_Workspace/
+    ├── 📁 data/                  <-- Put FASTQ files here (*_1.fq.gz, *_2.fq.gz)
+    │    └── 📁 ref/              <-- hg38.fasta and BWA index files
+    └── 📁 snpEff_db/             <-- SnpEff database folder
+         └── 📁 hg38/             <-- Must contain 'snpEffectPredictor.bin'
     ```
 
 ---
