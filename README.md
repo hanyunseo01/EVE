@@ -109,18 +109,17 @@ We provide a batch script for a seamless experience.
 4.  Wait for the message: `[INFO] Pipeline Completed Successfully!`
 
 ### 🐧 Option B: Linux / macOS
-Run the Docker container manually using the following command:
+Run the Docker container manually using the following command. Ensure you are in your project root directory (e.g., EVE_Workspace/).
 
 ```bash
-# Move to your project directory
-cd /path/to/EVE
+# 1. Pull the latest image
+docker pull hanyunseo01/eve:v2.0
 
-# Run the pipeline (v23)
+# 2. Run the pipeline
 docker run --rm \
-  -v "${PWD}/data:/data" \
-  -v "${PWD}/ref:/data/ref" \
-  -v "${PWD}/snpEff_db:/pipeline/snpEff/data" \
-  hanyunseo01/eve:1.0
+  -v "$PWD/data:/data" \
+  -v "$PWD/snpEff_db:/pipeline/snpEff/data" \
+  hanyunseo01/eve:v2.0
 ```
 ---
 
