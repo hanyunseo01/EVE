@@ -3,178 +3,270 @@ import subprocess
 import sys
 import glob
 import pandas as pd
+import myvariant
 
-# ==========================================
-# 1. 환경 설정 (Configuration) - Docker 내부 경로 기준
-# ==========================================
+# ========================================================
+# [Config] ThyroScope Pipeline (Parathyroid & Endocrine)
+# ========================================================
 
-# 환자 ID (나중에 입력 파일명에서 자동 추출하도록 변경 가능)
-SAMPLE_ID = "Patient_Test"
-
-# 파일 경로 설정 (도커 마운트 경로)
 DATA_DIR = "/data"
 REF_DIR = "/data/ref"
-PIPELINE_DIR = "/pipeline"
+REF_FILE = os.path.join(REF_DIR, "Homo_sapiens_assembly38.fasta")
 
-# 참조 유전체 및 타겟 파일
-# 주의: 사용자가 data/ref 폴더에 해당 파일들을 넣어둬야 함
-REF_GENOME = f"{REF_DIR}/Homo_sapiens_assembly38.fasta"
-TARGET_BED = f"{PIPELINE_DIR}/targets.bed"
+BED_PARATHYROID = "/pipeline/hypopara_targets.bed"   # Sheet 1: Parathyroid Focus
+BED_ENDOCRINE = "/pipeline/endocrine_targets.bed"    # Sheet 2: Endocrine Expansion
 
-# 툴 경로 설정
-# Trimmomatic (Docker 설치 시 기본 경로)
-TRIMMOMATIC_JAR = "/usr/share/java/trimmomatic.jar"
-# 어댑터 파일 (Illumina 장비 표준)
-ADAPTERS = "/usr/share/trimmomatic/adapters/TruSeq3-PE.fa"
+# Temporary file name for the combined BED file used in the analysis
+BED_COMBINED = "/pipeline/combined_targets.bed"
 
-# 기타 툴 명령어
-BWA = "bwa"
-GATK = "gatk"
-SAMTOOLS = "samtools"
-ANNOVAR_CMD = "table_annovar.pl" # ANNOVAR는 라이선스 문제로 별도 설치/설정 필요
+SNPEFF_JAR = "/pipeline/snpEff/snpEff.jar"
+SNPEFF_DB_DIR = "/pipeline/snpEff/data/hg38"
+THREADS = "4"
 
-# ==========================================
-# 2. 실행 함수 (Wrapper Function)
-# ==========================================
-def run_command(cmd, step_name):
-    print(f"\n[INFO] Starting Step: {step_name}")
+def run_command(cmd, step_name, output_check=None):
+    print(f"\n[INFO] Checking Step: {step_name}")
+    if output_check and os.path.exists(output_check):
+        if os.path.getsize(output_check) > 0:
+            print(f"[SKIP] File '{output_check}' already exists. Skipping.")
+            return
+        else:
+            print(f"[WARN] File exists but is empty. Re-running.")
+
     print(f"Command: {cmd}")
     try:
         subprocess.check_call(cmd, shell=True)
-        print(f"[SUCCESS] {step_name} completed.\n")
+        print(f"[SUCCESS] {step_name} completed.")
     except subprocess.CalledProcessError:
         print(f"[ERROR] {step_name} failed.")
-        # 파이프라인 중단 (에러 발생 시)
         sys.exit(1)
 
-# ==========================================
-# 3. 메인 파이프라인 (Main Workflow)
-# ==========================================
+def combine_bed_files(bed1, bed2, output_bed):
+    print(f"[INFO] Merging BED files into {output_bed}...")
+    try:
+        with open(output_bed, 'w') as outfile:
+            for fname in [bed1, bed2]:
+                if os.path.exists(fname):
+                    with open(fname) as infile:
+                        outfile.write(infile.read())
+                        outfile.write("\n") # 파일 끝 개행 보장
+                else:
+                    print(f"[ERROR] BED file missing: {fname}")
+                    sys.exit(1)
+        print(f"[SUCCESS] Merged BED created.")
+    except Exception as e:
+        print(f"[ERROR] Failed to merge BED files: {e}")
+        sys.exit(1)
+
+def get_gene_list_from_bed(bed_path):
+    genes = set()
+    if not os.path.exists(bed_path):
+        return genes
+
+    try:
+        with open(bed_path, 'r') as f:
+            for line in f:
+                if line.startswith("#") or not line.strip(): continue
+                parts = line.strip().split('\t')
+                if len(parts) >= 4:
+                    genes.add(parts[3].strip())
+    except Exception as e:
+        print(f"[ERROR] Failed to read gene names from BED: {e}")
+
+    return genes
+
+def get_myvariant_info(chrom, pos, ref, alt, mv):
+    hgvs_id = f"{chrom}:g.{pos}{ref}>{alt}"
+    clinvar_sig = "Not Found"
+    sift_pred = "-"
+    polyphen_pred = "-"
+    gnomad_af = "-"
+    rsid = "-"
+
+    try:
+        res = mv.getvariant(hgvs_id, assembly='hg38', fields='clinvar,dbnsfp,gnomad_genome,dbsnp')
+        if res:
+            if 'clinvar' in res and 'rcv' in res['clinvar']:
+                rcv = res['clinvar']['rcv']
+                if isinstance(rcv, list):
+                    clinvar_sig = rcv[0].get('clinical_significance', 'Check ClinVar')
+                else:
+                    clinvar_sig = rcv.get('clinical_significance', 'Check ClinVar')
+
+            if 'dbnsfp' in res:
+                if 'sift' in res['dbnsfp'] and 'pred' in res['dbnsfp']['sift']:
+                    sift_pred = res['dbnsfp']['sift']['pred']
+                if 'polyphen2_hvar' in res['dbnsfp'] and 'pred' in res['dbnsfp']['polyphen2_hvar']:
+                    polyphen_pred = res['dbnsfp']['polyphen2_hvar']['pred']
+
+            if 'gnomad_genome' in res and 'af' in res['gnomad_genome']:
+                if 'af' in res['gnomad_genome']['af']:
+                    gnomad_af = res['gnomad_genome']['af']['af']
+
+            if 'dbsnp' in res and 'rsid' in res['dbsnp']:
+                rsid = res['dbsnp']['rsid']
+    except:
+        pass
+
+    return clinvar_sig, sift_pred, polyphen_pred, gnomad_af, rsid
+
+def generate_tiered_report(snpeff_vcf, excel_file):
+    print(f"\n[INFO] Generating Report: Parathyroid vs Endocrine...")
+
+    # 1. 각 패널의 유전자 리스트 로딩
+    genes_parathyroid = get_gene_list_from_bed(BED_PARATHYROID)
+    genes_endocrine = get_gene_list_from_bed(BED_ENDOCRINE)
+
+    print(f" -> Loaded {len(genes_parathyroid)} genes for Sheet 1 (Parathyroid)")
+    print(f" -> Loaded {len(genes_endocrine)} genes for Sheet 2 (Endocrine)")
+
+    mv = myvariant.MyVariantInfo()
+    records = []
+
+    try:
+        with open(snpeff_vcf, 'r') as f:
+            for line in f:
+                if line.startswith("#"): continue
+                parts = line.strip().split('\t')
+                if len(parts) >= 8:
+                    chrom, pos, ref, alt, info = parts[0], parts[1], parts[3], parts[4], parts[7]
+
+                    gene_name = "Unknown"
+                    effect = "-"
+                    impact = "-"
+                    transcript_id = "-"
+                    dna_change = "-"
+                    protein_change = "-"
+
+                    ann_start = info.find("ANN=")
+                    if ann_start != -1:
+                        ann_str = info[ann_start+4:].split(';')[0]
+                        first_ann = ann_str.split(',')[0]
+                        fields = first_ann.split('|')
+
+                        if len(fields) > 1: effect = fields[1]
+                        if len(fields) > 2: impact = fields[2]
+                        if len(fields) > 3: gene_name = fields[3]
+                        if len(fields) > 6: transcript_id = fields[6]
+                        if len(fields) > 9: dna_change = fields[9]
+                        if len(fields) > 10: protein_change = fields[10]
+
+                    clinvar, sift, polyphen, gnomad, rsid = get_myvariant_info(chrom, pos, ref, alt, mv)
+
+                    records.append({
+                        "Gene": gene_name,
+                        "Variant ID": rsid,
+                        "Chromosome": chrom, "Position": pos, "Ref": ref, "Alt": alt,
+                        "Effect": effect,
+                        "Impact": impact,
+                        "DNA Change": dna_change, "Protein Change": protein_change,
+                        "ClinVar": clinvar, "gnomAD AF": gnomad,
+                        "SIFT": sift, "PolyPhen": polyphen,
+                        "Transcript ID": transcript_id
+                    })
+
+        # Full analysis results
+        df_full = pd.DataFrame(records)
+        cols = ["Gene", "Variant ID", "DNA Change", "Protein Change", "ClinVar", "gnomAD AF", "Effect", "Impact", "SIFT", "PolyPhen", "Chromosome", "Position"]
+
+        if not df_full.empty:
+            final_cols = [c for c in cols if c in df_full.columns] + [c for c in df_full.columns if c not in cols]
+            df_full = df_full[final_cols]
+
+            # [Filtering logic: Separate sheets]
+            # Sheet 1: Parathyroid (hypopara_targets.bed)
+            df_parathyroid = df_full[df_full['Gene'].isin(genes_parathyroid)]
+
+            # Sheet 2: Endocrine (endocrine_targets.bed)
+            df_endocrine = df_full[df_full['Gene'].isin(genes_endocrine)]
+
+            # Save to Excel with two sheets
+            with pd.ExcelWriter(excel_file, engine='openpyxl') as writer:
+                df_parathyroid.to_excel(writer, sheet_name='Parathyroid_Panel', index=False)
+                df_endocrine.to_excel(writer, sheet_name='Endocrine_Panel', index=False)
+
+            print(f"[SUCCESS] Report Saved: {excel_file}")
+            print(f" -> Sheet 'Parathyroid_Panel': {len(df_parathyroid)} variants")
+            print(f" -> Sheet 'Endocrine_Panel': {len(df_endocrine)} variants")
+
+        else:
+            print("[WARN] No variants found in VCF.")
+
+    except Exception as e:
+        print(f"[ERROR] Failed to create Excel: {e}")
+
 def main():
-    print(">>> Starting Thyroid/Parathyroid WES Pipeline (STAR Protocol Compliant) <<<")
-    
-    # 1) 입력 FASTQ 파일 찾기
-    fastqs = sorted(glob.glob(f"{DATA_DIR}/*.fastq.gz"))
-    if len(fastqs) < 2:
-        print(f"[ERROR] No FASTQ files found in {DATA_DIR}. Please check your data.")
+    print(">>> Starting ThyroScope Pipeline (Parathyroid & Endocrine Mode) <<<")
+
+    # 1. Check BED files
+    if not os.path.exists(BED_PARATHYROID) or not os.path.exists(BED_ENDOCRINE):
+        print(f"[ERROR] BED files missing inside container.")
+        print(f"Checking: {BED_PARATHYROID}")
+        print(f"Checking: {BED_ENDOCRINE}")
         sys.exit(1)
-        
-    r1_raw = fastqs[0]
-    r2_raw = fastqs[1]
-    print(f"Found Input Files: {r1_raw}, {r2_raw}")
 
-    # ---------------------------------------------------------
-    # Step 0: Trimming (Trimmomatic) - STAR Protocol 필수 단계
-    # ---------------------------------------------------------
-    # 어댑터 제거 및 퀄리티 낮은 염기서열 절단
-    r1_paired = f"{DATA_DIR}/{SAMPLE_ID}_R1_paired.fq.gz"
-    r1_unpaired = f"{DATA_DIR}/{SAMPLE_ID}_R1_unpaired.fq.gz"
-    r2_paired = f"{DATA_DIR}/{SAMPLE_ID}_R2_paired.fq.gz"
-    r2_unpaired = f"{DATA_DIR}/{SAMPLE_ID}_R2_unpaired.fq.gz"
+    # Combine the two files into combined_targets.bed
+    combine_bed_files(BED_PARATHYROID, BED_ENDOCRINE, BED_COMBINED)
 
-    cmd_trim = (
-        f"java -jar {TRIMMOMATIC_JAR} PE -threads 4 "
-        f"{r1_raw} {r2_raw} "
-        f"{r1_paired} {r1_unpaired} "
-        f"{r2_paired} {r2_unpaired} "
-        f"ILLUMINACLIP:{ADAPTERS}:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36"
-    )
-    run_command(cmd_trim, "0. Trimming (Trimmomatic)")
+    # Use the combined file for analysis
+    TARGETS_BED = BED_COMBINED
 
-    # ---------------------------------------------------------
-    # Step 1: Alignment (BWA-MEM)
-    # ---------------------------------------------------------
-    # ★ 중요: Trimming이 완료된 파일(r1_paired)을 입력으로 사용
-    bam_output = f"{DATA_DIR}/{SAMPLE_ID}.bam"
-    cmd_bwa = (
-        f"{BWA} mem -t 4 "
-        f"-R '@RG\\tID:{SAMPLE_ID}\\tSM:{SAMPLE_ID}\\tPL:ILLUMINA' "
-        f"{REF_GENOME} {r1_paired} {r2_paired} | "
-        f"{SAMTOOLS} view -bS - > {bam_output}"
-    )
-    run_command(cmd_bwa, "1. Alignment (BWA)")
+    # Input Check
+    r1_files = glob.glob(os.path.join(DATA_DIR, "*_1.fq.gz")) # .fq로 변경
+    if not r1_files:
+        print("[ERROR] No input FASTQ files found in /data.")
+        sys.exit(1)
+    r1 = r1_files[0]
+    r2 = r1.replace("_1.fq.gz", "_2.fq.gz") # .fq로 변경
+    base_name = os.path.basename(r1).split("_")[0]
 
-    # ---------------------------------------------------------
-    # Step 2: Sorting & Indexing
-    # ---------------------------------------------------------
-    sorted_bam = f"{DATA_DIR}/{SAMPLE_ID}.sorted.bam"
-    cmd_sort = f"{SAMTOOLS} sort -o {sorted_bam} {bam_output}"
-    run_command(cmd_sort, "2. Sorting (Samtools)")
-    
-    cmd_index = f"{SAMTOOLS} index {sorted_bam}"
-    run_command(cmd_index, "2-1. Indexing")
+    # Paths
+    trimmed_r1_paired = os.path.join(DATA_DIR, f"{base_name}_R1_paired.fq.gz")
+    trimmed_r1_unpaired = os.path.join(DATA_DIR, f"{base_name}_R1_unpaired.fq.gz")
+    trimmed_r2_paired = os.path.join(DATA_DIR, f"{base_name}_R2_paired.fq.gz")
+    trimmed_r2_unpaired = os.path.join(DATA_DIR, f"{base_name}_R2_unpaired.fq.gz")
 
-    # ---------------------------------------------------------
-    # Step 3: Mark Duplicates (GATK)
-    # ---------------------------------------------------------
-    dedup_bam = f"{DATA_DIR}/{SAMPLE_ID}.dedup.bam"
-    metrics_file = f"{DATA_DIR}/{SAMPLE_ID}.metrics.txt"
-    
-    cmd_dedup = (
-        f"{GATK} MarkDuplicates "
-        f"-I {sorted_bam} -O {dedup_bam} -M {metrics_file}"
-    )
-    run_command(cmd_dedup, "3. Mark Duplicates (GATK)")
-    
-    # 인덱싱 (GATK 다음 단계를 위해 필요)
-    run_command(f"{SAMTOOLS} index {dedup_bam}", "3-1. Dedup Indexing")
+    bam_file = os.path.join(DATA_DIR, f"{base_name}.bam")
+    sorted_bam = os.path.join(DATA_DIR, f"{base_name}.sorted.bam")
+    dedup_bam = os.path.join(DATA_DIR, f"{base_name}.dedup.bam")
+    metrics_file = os.path.join(DATA_DIR, f"{base_name}.metrics.txt")
+    raw_vcf = os.path.join(DATA_DIR, f"{base_name}.raw.vcf.gz")
+    snpeff_vcf = os.path.join(DATA_DIR, f"{base_name}.snpeff.vcf")
+    excel_report = os.path.join(DATA_DIR, f"{base_name}_Final_Report.xlsx")
 
-    # ---------------------------------------------------------
-    # Step 4: Variant Calling (Targeted)
-    # ---------------------------------------------------------
-    vcf_output = f"{DATA_DIR}/{SAMPLE_ID}.vcf"
-    
-    cmd_hc = (
-        f"{GATK} HaplotypeCaller "
-        f"-R {REF_GENOME} "
-        f"-I {dedup_bam} "
-        f"-O {vcf_output} "
-        f"-L {TARGET_BED} "       # 선생님의 타겟 유전자 리스트 사용
-        f"--interval-padding 100" # 유전자 주변 100bp까지 포함
-    )
-    run_command(cmd_hc, "4. Variant Calling (GATK HaplotypeCaller)")
+    # --- Pipeline Execution ---
+    run_command(f"java -jar /usr/share/java/trimmomatic.jar PE -threads {THREADS} {r1} {r2} {trimmed_r1_paired} {trimmed_r1_unpaired} {trimmed_r2_paired} {trimmed_r2_unpaired} ILLUMINACLIP:/usr/share/trimmomatic/adapters/TruSeq3-PE.fa:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36", "Step 0: Trimming", trimmed_r1_paired)
+    run_command(f"bwa mem -t {THREADS} -R '@RG\\tID:{base_name}\\tSM:{base_name}\\tPL:ILLUMINA' {REF_FILE} {trimmed_r1_paired} {trimmed_r2_paired} | samtools view -bS - > {bam_file}", "Step 1: Alignment", bam_file)
+    run_command(f"samtools sort -o {sorted_bam} {bam_file}", "Step 2: Sorting", sorted_bam)
+    run_command(f"samtools index {sorted_bam}", "Step 2-1: Indexing", f"{sorted_bam}.bai")
+    run_command(f"gatk MarkDuplicates -I {sorted_bam} -O {dedup_bam} -M {metrics_file}", "Step 3: MarkDuplicates", dedup_bam)
+    run_command(f"samtools index {dedup_bam}", "Step 3-1: Dedup Indexing", f"{dedup_bam}.bai")
 
-    # ---------------------------------------------------------
-    # Step 5: Annotation (ANNOVAR) - 예시 코드
-    # ---------------------------------------------------------
-    # 주의: ANNOVAR DB가 설치되어 있어야 작동합니다. (Docker 이미지에 DB 포함 권장)
-    # 만약 ANNOVAR가 없다면 이 단계에서 에러가 날 수 있으므로 try-except 처리하거나 주석 처리
-    anno_output = f"{DATA_DIR}/{SAMPLE_ID}.anno"
-    try:
-        cmd_anno = (
-            f"{ANNOVAR_CMD} {vcf_output} {DATA_DIR}/humandb/ -buildver hg38 "
-            f"-out {anno_output} -remove -protocol refGene,cytoBand,gnomad211_exome,clinvar_20221231 "
-            f"-operation g,r,f,f -nastring . -vcfinput"
-        )
-        # run_command(cmd_anno, "5. Annotation (ANNOVAR)") 
-        # ▲ 실제 실행하려면 위 주석(#)을 해제하고 ANNOVAR DB를 연결해야 합니다.
-        print("[INFO] Step 5 (Annotation) skipped in this demo script. (Requires ANNOVAR DB)")
-        
-    except Exception as e:
-        print(f"[WARNING] Annotation step failed or skipped: {e}")
+    # Mosdepth Coverage (Based on combined targets)
+    print("\n[INFO] Running Mosdepth (Combined Targets)...")
+    mosdepth_prefix = os.path.join(DATA_DIR, f"{base_name}_coverage")
+    run_command(f"mosdepth --by {TARGETS_BED} --fast-mode --threads {THREADS} {mosdepth_prefix} {dedup_bam}", "Step 3-2: Mosdepth Coverage", f"{mosdepth_prefix}.mosdepth.summary.txt")
 
-    # ---------------------------------------------------------
-    # Step 6: Final Reporting (Excel)
-    # ---------------------------------------------------------
-    print(">>> Generating Clinical Report... <<<")
-    
-    # ANNOVAR 결과 파일이 있다고 가정하고 엑셀 변환 (없으면 VCF만 변환)
-    # 여기서는 간단히 VCF를 파싱하여 엑셀로 만드는 예시를 보여드립니다.
-    
-    try:
-        # VCF 파일 읽기 (주석 줄 제외)
-        vcf_cols = ["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT", "SAMPLE"]
-        df = pd.read_csv(vcf_output, sep="\t", comment='#', names=vcf_cols)
-        
-        # 엑셀 저장
-        excel_output = f"{DATA_DIR}/{SAMPLE_ID}_Clinical_Report.xlsx"
-        df.to_excel(excel_output, index=False)
-        print(f"[SUCCESS] Excel Report Saved: {excel_output}")
-        
-    except Exception as e:
-        print(f"[WARNING] Could not generate Excel report: {e}")
+    # Variant Calling (Based on combined targets)
+    run_command(f"gatk HaplotypeCaller -R {REF_FILE} -I {dedup_bam} -O {raw_vcf} -L {TARGETS_BED} --interval-padding 100", "Step 4: Variant Calling", raw_vcf)
 
-    print("\n>>> All Pipeline Steps Completed Successfully! <<<")
+    # Step 5: SnpEff Annotation
+    print("\n[INFO] Checking SnpEff Database...")
+    if not os.path.exists(os.path.join(SNPEFF_DB_DIR, "snpEffectPredictor.bin")):
+        print("[CRITICAL ERROR] SnpEff database not found!")
+        sys.exit(1)
+
+    if os.path.exists(raw_vcf):
+        cmd_snpeff = f"java -Xmx4g -jar {SNPEFF_JAR} hg38 {raw_vcf} > {snpeff_vcf}"
+        run_command(cmd_snpeff, "Step 5: SnpEff Annotation", snpeff_vcf)
+
+    if os.path.exists(snpeff_vcf):
+        generate_tiered_report(snpeff_vcf, excel_report)
+
+    # MultiQC Report Generation
+    print("\n[INFO] Generating MultiQC Quality Report...")
+    run_command(f"multiqc {DATA_DIR} -o {DATA_DIR} -n {base_name}_MultiQC_Report.html --force", "Step 6: MultiQC", f"{DATA_DIR}/{base_name}_MultiQC_Report.html")
+
+    print("\n[INFO] Pipeline Completed Successfully!")
 
 if __name__ == "__main__":
     main()
