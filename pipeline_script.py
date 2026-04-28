@@ -6,7 +6,7 @@ import pandas as pd
 import myvariant
 
 # ========================================================
-# [Config] ThyroScope Pipeline (Parathyroid & Endocrine)
+# [Config] EVE Pipeline (Parathyroid & Endocrine)
 # ========================================================
 
 DATA_DIR = "/data"
