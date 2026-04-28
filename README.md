@@ -74,18 +74,12 @@ EVE automates the following bioinformatics steps in a sequential manner:
 
 Since EVE uses a **lightweight strategy**, you must download the reference bundles separately.
 
-1.  **Clone this Repository** (or download the ZIP):
-    ```bash
-    git clone [https://github.com/hanyunseo01/EVE.git](https://github.com/hanyunseo01/EVE.git)
-    cd ThyroScope
-    ```
-
-2.  **Download Reference Data:**
+1.  **Download Reference Data:**
     * Download the `ref` (BWA Indices) and `snpEff_db` folders from our repository storage.
     * [**📂 Download Link (Google Drive)**](#) *(Link to be updated)*
     * Place them in your project folder.
 
-3.  **Directory Structure:**
+2.  **Directory Structure:**
     Create a workspace folder and arrange your files exactly as shown below.
     ```text
     EVE/
@@ -95,6 +89,8 @@ Since EVE uses a **lightweight strategy**, you must download the reference bundl
     └── 📁 snpEff_db/             <-- SnpEff database folder
          └── 📁 hg38/             <-- Must contain 'snpEffectPredictor.bin'
     ```
+    > [!IMPORTANT]
+    > > **File Extension Requirement:** Input sequencing data **must** use the `.fq.gz` extension (e.g., `sample_1.fq.gz`). Files ending in `.fastq.gz` or `.fq` will not be recognized by the pipeline.
 
 ---
 
