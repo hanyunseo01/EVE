@@ -76,7 +76,7 @@ Since EVE uses a **lightweight strategy**, you must download the reference bundl
 
 1.  **Download Reference Data:**
     * Download the `ref` (BWA Indices) and `snpEff_db` folders from our repository storage.
-    * [**📂 Download Link (Google Drive)**](#) *(Link to be updated)*
+    * [**📂 Download Link (Google Drive)**](https://drive.google.com/drive/folders/1SmEH-AxT4eHSB-vNVKc0ZphOGIe2zvVM?usp=drive_link) 
     * Place them in your project folder.
 
 2.  **Directory Structure:**
