@@ -307,7 +307,7 @@ We provide a batch script for the simplest possible execution.
 
 4. Copy and paste the following command into Terminal and press **Enter**:
    ```bash
-   docker run --rm \
+   docker run --rm -it \
      -v "$PWD/data:/data" \
      -v "$PWD/snpEff_db:/pipeline/snpEff/data" \
      hanyunseo01/eve:latest
