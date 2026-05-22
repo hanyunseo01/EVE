@@ -393,7 +393,7 @@ mkdir custom_panel
 cd custom_panel
 ```
 
-Download `generate_bed_new.py` from this repository into the `custom_panel/` folder.
+Download `generate_bed.py` from this repository into the `custom_panel/` folder.
 
 Create two plain-text files listing your gene symbols, one per line:
 
@@ -418,11 +418,11 @@ PTH
 From inside the `custom_panel/` folder:
 
 ```bash
-python3 generate_bed_new.py \
+python3 generate_bed.py \
   --genes my_hypopara_genes.txt \
   --output my_hypopara_targets.bed
 
-python3 generate_bed_new.py \
+python3 generate_bed.py \
   --genes my_endocrine_genes.txt \
   --output my_endocrine_targets.bed
 ```
