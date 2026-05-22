@@ -1,5 +1,5 @@
 # =================================================================
-# Dockerfile for EVE
+# Dockerfile for ThyroScope 
 # =================================================================
 FROM broadinstitute/gatk:4.4.0.0
 
@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean
 
 # 2. Install Mosdepth (For Coverage Analysis, direct binary download)
-RUN wget https://github.com/brentp/mosdepth/releases/download/v0.3.3/mosdepth -O /usr/bin/mosdepth \
+RUN wget https://github.com/brentp/mosdepth/releases/download/v0.3.6/mosdepth -O /usr/bin/mosdepth \
     && chmod +x /usr/bin/mosdepth
 
 # 3. Install Python Libraries (Including MultiQC)
