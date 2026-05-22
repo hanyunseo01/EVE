@@ -13,10 +13,12 @@ DATA_DIR = "/data"
 REF_DIR = "/data/ref"
 REF_FILE = os.path.join(REF_DIR, "Homo_sapiens_assembly38.fasta")
 
-BED_PARATHYROID = "/pipeline/hypopara_targets.bed"   # Sheet 1: Parathyroid Focus
-BED_ENDOCRINE = "/pipeline/endocrine_targets.bed"    # Sheet 2: Endocrine Expansion
+# BED files must be located in the host's pipeline folder and mounted into the container.
+# To use custom panels, override these paths using Docker -v mount options (see README).
+BED_PARATHYROID = "/pipeline/hypopara_targets.bed"   # Sheet 1: Core Parathyroid Panel
+BED_ENDOCRINE = "/pipeline/endocrine_targets.bed"    # Sheet 2: Endocrine Expansion Panel
 
-# Temporary file name for the combined BED file used in the analysis
+# Temporary merged BED file combining both panels for variant calling
 BED_COMBINED = "/pipeline/combined_targets.bed"
 
 SNPEFF_JAR = "/pipeline/snpEff/snpEff.jar"
@@ -48,7 +50,7 @@ def combine_bed_files(bed1, bed2, output_bed):
                 if os.path.exists(fname):
                     with open(fname) as infile:
                         outfile.write(infile.read())
-                        outfile.write("\n") # 파일 끝 개행 보장
+                        outfile.write("\n") # Ensure newline at end of each file
                 else:
                     print(f"[ERROR] BED file missing: {fname}")
                     sys.exit(1)
@@ -95,8 +97,11 @@ def get_myvariant_info(chrom, pos, ref, alt, mv):
             if 'dbnsfp' in res:
                 if 'sift' in res['dbnsfp'] and 'pred' in res['dbnsfp']['sift']:
                     sift_pred = res['dbnsfp']['sift']['pred']
-                if 'polyphen2_hvar' in res['dbnsfp'] and 'pred' in res['dbnsfp']['polyphen2_hvar']:
-                    polyphen_pred = res['dbnsfp']['polyphen2_hvar']['pred']
+                if 'polyphen2' in res['dbnsfp']:
+                    pp2 = res['dbnsfp']['polyphen2']
+                    if isinstance(pp2, dict) and 'hvar' in pp2:
+                        hvar = pp2['hvar']
+                        if isinstance(hvar, dict) and 'pred' in hvar:polyphen_pred = hvar['pred']
 
             if 'gnomad_genome' in res and 'af' in res['gnomad_genome']:
                 if 'af' in res['gnomad_genome']['af']:
@@ -112,7 +117,7 @@ def get_myvariant_info(chrom, pos, ref, alt, mv):
 def generate_tiered_report(snpeff_vcf, excel_file):
     print(f"\n[INFO] Generating Report: Parathyroid vs Endocrine...")
 
-    # 1. 각 패널의 유전자 리스트 로딩
+    # Load gene lists from each BED panel
     genes_parathyroid = get_gene_list_from_bed(BED_PARATHYROID)
     genes_endocrine = get_gene_list_from_bed(BED_ENDOCRINE)
 
@@ -164,7 +169,7 @@ def generate_tiered_report(snpeff_vcf, excel_file):
                         "Transcript ID": transcript_id
                     })
 
-        # Full analysis results
+        # Build full variant dataframe
         df_full = pd.DataFrame(records)
         cols = ["Gene", "Variant ID", "DNA Change", "Protein Change", "ClinVar", "gnomAD AF", "Effect", "Impact", "SIFT", "PolyPhen", "Chromosome", "Position"]
 
@@ -172,14 +177,14 @@ def generate_tiered_report(snpeff_vcf, excel_file):
             final_cols = [c for c in cols if c in df_full.columns] + [c for c in df_full.columns if c not in cols]
             df_full = df_full[final_cols]
 
-            # [Filtering logic: Separate sheets]
-            # Sheet 1: Parathyroid (hypopara_targets.bed)
+            # Split variants into two sheets based on panel membership
+            # Sheet 1: Core Parathyroid Panel (hypopara_targets.bed)
             df_parathyroid = df_full[df_full['Gene'].isin(genes_parathyroid)]
 
-            # Sheet 2: Endocrine (endocrine_targets.bed)
+            # Sheet 2: Endocrine Expansion Panel (endocrine_targets.bed)
             df_endocrine = df_full[df_full['Gene'].isin(genes_endocrine)]
 
-            # Save to Excel with two sheets
+            # Save to Excel
             with pd.ExcelWriter(excel_file, engine='openpyxl') as writer:
                 df_parathyroid.to_excel(writer, sheet_name='Parathyroid_Panel', index=False)
                 df_endocrine.to_excel(writer, sheet_name='Endocrine_Panel', index=False)
@@ -195,31 +200,31 @@ def generate_tiered_report(snpeff_vcf, excel_file):
         print(f"[ERROR] Failed to create Excel: {e}")
 
 def main():
-    print(">>> Starting ThyroScope Pipeline (Parathyroid & Endocrine Mode) <<<")
+    print(">>> Starting EVE Pipeline (Parathyroid & Endocrine Mode) <<<")
 
-    # 1. Check BED files
+    # Verify BED files exist inside the container
     if not os.path.exists(BED_PARATHYROID) or not os.path.exists(BED_ENDOCRINE):
         print(f"[ERROR] BED files missing inside container.")
         print(f"Checking: {BED_PARATHYROID}")
         print(f"Checking: {BED_ENDOCRINE}")
         sys.exit(1)
 
-    # Combine the two files into combined_targets.bed
+    # Merge both BED panels into a single combined file for variant calling
     combine_bed_files(BED_PARATHYROID, BED_ENDOCRINE, BED_COMBINED)
 
-    # Use the combined file for analysis
+    # All downstream steps use the combined BED
     TARGETS_BED = BED_COMBINED
 
-    # Input Check
-    r1_files = glob.glob(os.path.join(DATA_DIR, "*_1.fq.gz")) # .fq로 변경
+    # Detect input FASTQ files (must follow naming convention: *_1.fq.gz / *_2.fq.gz)
+    r1_files = glob.glob(os.path.join(DATA_DIR, "*_1.fq.gz"))
     if not r1_files:
         print("[ERROR] No input FASTQ files found in /data.")
         sys.exit(1)
     r1 = r1_files[0]
-    r2 = r1.replace("_1.fq.gz", "_2.fq.gz") # .fq로 변경
+    r2 = r1.replace("_1.fq.gz", "_2.fq.gz")
     base_name = os.path.basename(r1).split("_")[0]
 
-    # Paths
+    # Define output file paths
     trimmed_r1_paired = os.path.join(DATA_DIR, f"{base_name}_R1_paired.fq.gz")
     trimmed_r1_unpaired = os.path.join(DATA_DIR, f"{base_name}_R1_unpaired.fq.gz")
     trimmed_r2_paired = os.path.join(DATA_DIR, f"{base_name}_R2_paired.fq.gz")
@@ -234,35 +239,38 @@ def main():
     excel_report = os.path.join(DATA_DIR, f"{base_name}_Final_Report.xlsx")
 
     # --- Pipeline Execution ---
+    run_command(f"fastqc {r1} {r2} -o {DATA_DIR} -t {THREADS} --quiet", "Step 0-1: FastQC (raw reads)", os.path.join(DATA_DIR, f"{base_name}_1_fastqc.html"))
     run_command(f"java -jar /usr/share/java/trimmomatic.jar PE -threads {THREADS} {r1} {r2} {trimmed_r1_paired} {trimmed_r1_unpaired} {trimmed_r2_paired} {trimmed_r2_unpaired} ILLUMINACLIP:/usr/share/trimmomatic/adapters/TruSeq3-PE.fa:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36", "Step 0: Trimming", trimmed_r1_paired)
+    run_command(f"fastqc {trimmed_r1_paired} {trimmed_r2_paired} -o {DATA_DIR} -t {THREADS} --quiet", "Step 0-3: FastQC (trimmed reads)", os.path.join(DATA_DIR, f"{base_name}_R1_paired_fastqc.html"))
     run_command(f"bwa mem -t {THREADS} -R '@RG\\tID:{base_name}\\tSM:{base_name}\\tPL:ILLUMINA' {REF_FILE} {trimmed_r1_paired} {trimmed_r2_paired} | samtools view -bS - > {bam_file}", "Step 1: Alignment", bam_file)
     run_command(f"samtools sort -o {sorted_bam} {bam_file}", "Step 2: Sorting", sorted_bam)
     run_command(f"samtools index {sorted_bam}", "Step 2-1: Indexing", f"{sorted_bam}.bai")
     run_command(f"gatk MarkDuplicates -I {sorted_bam} -O {dedup_bam} -M {metrics_file}", "Step 3: MarkDuplicates", dedup_bam)
     run_command(f"samtools index {dedup_bam}", "Step 3-1: Dedup Indexing", f"{dedup_bam}.bai")
 
-    # Mosdepth Coverage (Based on combined targets)
+    # Coverage analysis over combined target regions
     print("\n[INFO] Running Mosdepth (Combined Targets)...")
     mosdepth_prefix = os.path.join(DATA_DIR, f"{base_name}_coverage")
-    run_command(f"mosdepth --by {TARGETS_BED} --fast-mode --threads {THREADS} {mosdepth_prefix} {dedup_bam}", "Step 3-2: Mosdepth Coverage", f"{mosdepth_prefix}.mosdepth.summary.txt")
+    run_command(f"mosdepth --by {TARGETS_BED} --thresholds 1,10,20,30,50,100 --threads {THREADS} {mosdepth_prefix} {dedup_bam}", "Step 3-2: Mosdepth Coverage", f"{mosdepth_prefix}.mosdepth.summary.txt")
 
-    # Variant Calling (Based on combined targets)
-    run_command(f"gatk HaplotypeCaller -R {REF_FILE} -I {dedup_bam} -O {raw_vcf} -L {TARGETS_BED} --interval-padding 100", "Step 4: Variant Calling", raw_vcf)
+    # Variant calling restricted to combined target intervals
+    run_command(f"gatk HaplotypeCaller -R {REF_FILE} -I {dedup_bam} -O {raw_vcf} -L {TARGETS_BED}", "Step 4: Variant Calling", raw_vcf)
 
-    # Step 5: SnpEff Annotation
+    # SnpEff functional annotation
     print("\n[INFO] Checking SnpEff Database...")
     if not os.path.exists(os.path.join(SNPEFF_DB_DIR, "snpEffectPredictor.bin")):
         print("[CRITICAL ERROR] SnpEff database not found!")
         sys.exit(1)
 
     if os.path.exists(raw_vcf):
-        cmd_snpeff = f"java -Xmx4g -jar {SNPEFF_JAR} hg38 {raw_vcf} > {snpeff_vcf}"
+        cmd_snpeff = f"java -Xmx4g -jar {SNPEFF_JAR} -canon hg38 {raw_vcf} > {snpeff_vcf}"
         run_command(cmd_snpeff, "Step 5: SnpEff Annotation", snpeff_vcf)
 
+    # Generate tiered clinical Excel report
     if os.path.exists(snpeff_vcf):
         generate_tiered_report(snpeff_vcf, excel_report)
 
-    # MultiQC Report Generation
+    # Aggregate QC metrics into MultiQC report
     print("\n[INFO] Generating MultiQC Quality Report...")
     run_command(f"multiqc {DATA_DIR} -o {DATA_DIR} -n {base_name}_MultiQC_Report.html --force", "Step 6: MultiQC", f"{DATA_DIR}/{base_name}_MultiQC_Report.html")
 
