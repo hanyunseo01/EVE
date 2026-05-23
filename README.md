@@ -385,22 +385,30 @@ If `python3` is not found, download it from [python.org](https://www.python.org/
 
 ## Step 2 — Prepare your gene list files
 
-Inside `EVE_Workspace`, create a new folder named `custom_panel`:
+Inside `EVE_Workspace`, create a new folder named `custom_panel`.
 
+**Mac/Linux:**
 ```bash
 cd ~/Desktop/EVE_Workspace
 mkdir custom_panel
 cd custom_panel
 ```
 
-Download `generate_bed.py` from this repository into the `custom_panel/` folder.
+**Windows (PowerShell):**
+```powershell
+cd $env:USERPROFILE\Desktop\EVE_Workspace
+mkdir custom_panel
+cd custom_panel
+```
 
+Download `generate_bed.py` from this repository into the `custom_panel/` folder.
 Create two plain-text files listing your gene symbols, one per line:
 
-- **`my_hypopara_genes.txt`** — your Tier 1 (core) panel
-- **`my_endocrine_genes.txt`** — your Tier 2 (expansion) panel
+- `my_hypopara_genes.txt` — your Tier 1 (core) panel
+- `my_endocrine_genes.txt` — your Tier 2 (expansion) panel
 
 Example contents:
+
 ```
 GATA3
 CASR
@@ -410,13 +418,15 @@ PTH
 ...
 ```
 
-> [!WARNING]
-> **TextEdit on Mac saves files in Rich Text format by default** — this will break the script. Before saving, go to **Format → Make Plain Text** (`⌘⇧T`), then save with a `.txt` extension. Alternatively use a code editor like VS Code or any plain-text editor.
+> **⚠️ Warning (Mac):** TextEdit saves in Rich Text format by default — this will break the script. Go to Format → Make Plain Text (`⌘⇧T`) before saving. Alternatively use VS Code or any plain-text editor.
+
+> **⚠️ Warning (Windows):** When saving with Notepad, type the filename as `my_hypopara_genes.txt` manually and set "Save as type" to **All Files** — otherwise Windows saves it as `my_hypopara_genes.txt.txt`.
+
+---
 
 ## Step 3 — Generate the BED files
 
-From inside the `custom_panel/` folder:
-
+**Mac/Linux:**
 ```bash
 python3 generate_bed.py \
   --genes my_hypopara_genes.txt \
@@ -425,6 +435,12 @@ python3 generate_bed.py \
 python3 generate_bed.py \
   --genes my_endocrine_genes.txt \
   --output my_endocrine_targets.bed
+```
+
+**Windows (PowerShell):**
+```powershell
+python generate_bed.py --genes my_hypopara_genes.txt --output my_hypopara_targets.bed
+python generate_bed.py --genes my_endocrine_genes.txt --output my_endocrine_targets.bed
 ```
 
 The script queries MyGene.info for each gene's exon coordinates, applies 50 bp padding around each exon, merges overlapping regions, and writes a sorted BED file. At the end you'll see a validation summary like:
