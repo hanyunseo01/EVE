@@ -39,6 +39,7 @@ echo.
 docker pull hanyunseo01/eve:latest
 
 docker run --rm ^
+  -e PYTHONUNBUFFERED=1 ^
   -v "%cd%\data:/data" ^
   -v "%cd%\snpEff_db:/pipeline/snpEff/data" ^
   hanyunseo01/eve:latest
