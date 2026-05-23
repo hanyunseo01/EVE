@@ -36,11 +36,11 @@ if not exist "data\*.fq*" (
 echo [INFO] Files found! Starting analysis...
 echo.
 
-docker pull hanyunseo01/eve:v2.0
+docker pull hanyunseo01/eve:latest
 
 docker run --rm ^
   -v "%cd%\data:/data" ^
   -v "%cd%\snpEff_db:/pipeline/snpEff/data" ^
-  hanyunseo01/eve:v2.0
+  hanyunseo01/eve:latest
 
 pause
