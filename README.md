@@ -22,9 +22,8 @@ The Docker image is published as a **multi-architecture build** (`linux/amd64` +
 
 If this is your first time using EVE, **we strongly recommend watching the step-by-step video tutorial** before reading this document. The tutorial walks you through the entire workflow — from installing Docker on a fresh computer to interpreting your final clinical report — and is designed specifically for clinicians without prior bioinformatics experience.
 
-▶️ **[Watch on YouTube](https://youtube.com/)**
-
-Separate tutorials are provided for **macOS** and **Windows** users.
+▶️ **[macOS Tutorial](https://m.youtube.com/watch?v=NvHMvceFRJA&ra=m)**
+▶️ **[Windows Tutorial](https://youtu.be/XdNJLnu0iBg)**
 
 ---
 
