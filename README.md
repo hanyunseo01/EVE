@@ -511,7 +511,7 @@ After the analysis completes, check the `data/` folder for these key files:
 
 The **Clinical Report** is designed for immediate clinical interpretation. It aggregates data from **SnpEff**, **ClinVar**, **gnomAD**, and **dbSNP** into a single view.
 
-![Final Report Example](images/final_report_example.png)
+![Final Report Example](images/final_report_example.jpg)
 *This is an example output for illustration purposes only, not actual patient data.*
 
 | Column Category | Columns Included | Description |
