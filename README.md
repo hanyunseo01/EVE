@@ -14,7 +14,7 @@ By integrating a **"Virtual Panel"** approach, EVE filters massive genomic data 
 
 The Docker image is published as a **multi-architecture build** (`linux/amd64` + `linux/arm64`), so EVE runs natively on both Intel and Apple Silicon Macs as well as standard Windows PCs.
 
-![EVE Pipeline Diagram](EVE%20Pipeline%20Architecture.jpg)
+![EVE Pipeline Diagram](images/EVE%20Pipeline%20Architecture.jpg)
 
 ---
 
