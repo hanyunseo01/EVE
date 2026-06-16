@@ -357,7 +357,7 @@ docker run --rm -it \
 
 # 🧬 Using Your Own Gene Panel (Advanced)
 
-EVE's default panels (26 parathyroid + 413 endocrine genes) reflect the panel routinely used at the Korea University endocrine genetics program, but **you can substitute your own gene lists** without modifying or rebuilding the Docker image.
+EVE's default panels (26 parathyroid + 413 endocrine genes) reflect the panel routinely used at the Yonsei University Health System endocrine genetics program, but **you can substitute your own gene lists** without modifying or rebuilding the Docker image.
 
 This is useful if your institution uses a different panel, if you're investigating a different endocrine sub-domain, or if you want to test additional candidate genes.
 
